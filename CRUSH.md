@@ -39,6 +39,19 @@ bun run preview   # serve the production build
   green after every task.
 - No tests and no linter are configured yet. Match the existing code style.
 
+### Container image (lighttpd)
+
+Production deploy serves the built SPA with lighttpd, which also reverse-proxies
+same-origin `/api/*` to the backend (prefix stripped) — see `Containerfile`,
+`container/lighttpd.conf`, `container/entrypoint.sh`:
+
+```bash
+podman build -t askowl-webapp .
+# run on the same network as the API; the default PROXY_HOST is "api"
+podman run -d --name AskOwl-Webapp -p 8090:80 --network askowlapi_AskOwl-Net askowl-webapp
+# API elsewhere: -e PROXY_HOST=<host> -e PROXY_PORT=<port>
+```
+
 ## LSP (Vue + TypeScript)
 
 Two language servers are configured in the global `~/.config/crush/crushrc`
