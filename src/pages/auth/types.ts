@@ -1,17 +1,11 @@
-export interface LoginData {
-  identifier: string; // Email or nickname
+export interface LoginForm {
+  identifier: string;
   password: string;
 }
 
-export interface RegisterData {
-  name: string;
+export interface RegisterForm {
   email: string;
   nickname: string;
   password: string;
   confirmPassword: string;
-}
-
-export interface AuthFormState {
-  loading: boolean;
-  error: string | null;
 }

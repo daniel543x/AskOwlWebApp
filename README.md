@@ -72,8 +72,8 @@ src/
 - [Development Guide](docs/development/1_introduction.md)
 - [Administration Guide](docs/administration/1_introduction.md)
 - [User Guide](docs/using/1_introduction.md)
-- [Agent Guide](AGENTS.md)
-- [Roadmap](ROADMAP.md)
+- [Agent Guide](CRUSH.md)
+- [Prototype Plan](PLAN.md)
 
 ## Development
 
@@ -100,4 +100,4 @@ See [LICENSE](LICENSE) file for details.
 
 ## Status
 
-🚧 **Active Development** - This project is in early development. Features are being implemented according to the [roadmap](ROADMAP.md).
+🚧 **Active Development** - This project is in early development. The prototype was implemented according to the phased [plan](PLAN.md).
