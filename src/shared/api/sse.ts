@@ -1,10 +1,6 @@
-import {
-  ApiError,
-  extractErrorMessage,
-  getStoredToken,
-  triggerUnauthorized,
-  type QueryParams,
-} from "./http";
+import { ApiError, extractErrorMessage, triggerUnauthorized, type QueryParams } from "./http";
+import { refreshSession } from "./refresh";
+import { getStoredToken } from "./tokens";
 
 export interface SseFrame {
   event: string;
@@ -75,6 +71,15 @@ export async function streamSse(
   options: StreamOptions,
   onEvent: (frame: SseFrame) => void,
 ): Promise<void> {
+  return openStream(path, options, onEvent, false);
+}
+
+async function openStream(
+  path: string,
+  options: StreamOptions,
+  onEvent: (frame: SseFrame) => void,
+  retriedAfterRefresh: boolean,
+): Promise<void> {
   const url = buildUrl(path, options.params);
   const headers: Record<string, string> = { Accept: "text/event-stream" };
   const token = getStoredToken();
@@ -101,7 +106,17 @@ export async function streamSse(
   }
 
   if (!response.ok || !response.body) {
-    if (response.status === 401 && token) {
+    if (response.status === 401 && token && !retriedAfterRefresh) {
+      try {
+        const refreshed = await refreshSession();
+        if (refreshed !== null) {
+          return openStream(path, options, onEvent, true);
+        }
+        triggerUnauthorized();
+      } catch {
+        // transient refresh failure — surface the original 401
+      }
+    } else if (response.status === 401 && token) {
       triggerUnauthorized();
     }
     throw new ApiError(response.status, await extractErrorMessage(response));

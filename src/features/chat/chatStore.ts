@@ -35,6 +35,15 @@ export const useChatStore = defineStore("chat", () => {
     conversations.value = conversations.value.filter((item) => item.id !== id);
   }
 
+  // The API has no rename endpoint yet; the title is updated locally only
+  // and reverts on the next reload until the backend ships one.
+  function renameConversation(id: string, title: string): void {
+    const item = conversations.value.find((entry) => entry.id === id);
+    if (item) {
+      item.title = title;
+    }
+  }
+
   function reset(): void {
     conversations.value = [];
     listLoading.value = false;
@@ -48,6 +57,7 @@ export const useChatStore = defineStore("chat", () => {
     loadConversations,
     upsertConversation,
     deleteConversation,
+    renameConversation,
     reset,
   };
 });

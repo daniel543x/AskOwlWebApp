@@ -11,6 +11,12 @@ import Skeleton from "primevue/skeleton";
 import Textarea from "primevue/textarea";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
+import {
+    ExclamationCircleIcon,
+    PencilIcon,
+    PlusIcon,
+    TrashIcon,
+} from "@heroicons/vue/24/outline";
 import { ApiError } from "../../shared/api/http";
 import { formatRelativeTime } from "../../shared/utils/relativeTime";
 import { usePersonas } from "../../features/settings/usePersonas";
@@ -130,7 +136,6 @@ function askDelete(persona: PersonaRead): void {
   confirm.require({
     message: `Delete persona "${persona.name}"? Agents will no longer be able to use it.`,
     header: "Delete persona",
-    icon: "pi pi-exclamation-triangle",
     acceptLabel: "Delete",
     rejectLabel: "Cancel",
     accept: async () => {
@@ -157,7 +162,9 @@ function askDelete(persona: PersonaRead): void {
                 Personas shape agent behavior: system context, allowed domains, engines and
                 keywords, and lower runtime budgets.
             </p>
-            <Button icon="pi pi-plus" label="New persona" size="small" @click="openCreate()" />
+            <Button label="New persona" size="small" @click="openCreate()">
+                <template #icon><PlusIcon class="askowl-icon" /></template>
+            </Button>
         </div>
 
         <div v-if="loading" class="table-skeleton">
@@ -167,7 +174,7 @@ function askDelete(persona: PersonaRead): void {
                 <Skeleton height="1.25rem" width="15%" />
             </div>
         </div>
-        <DataTable v-else :value="personas" data-key="id" striped-rows>
+        <DataTable v-else :value="personas" data-key="id">
             <template #empty>
                 <span class="empty-note">No personas yet. Create one to scope agent runs.</span>
             </template>
@@ -188,8 +195,12 @@ function askDelete(persona: PersonaRead): void {
             <Column header="Actions" style="width: 12rem">
                 <template #body="{ data }">
                     <div class="row-actions">
-                        <Button icon="pi pi-pencil" text rounded size="small" aria-label="Edit persona" @click="openEdit(data)" />
-                        <Button icon="pi pi-trash" text rounded severity="danger" size="small" aria-label="Delete persona" @click="askDelete(data)" />
+                        <Button text rounded size="small" aria-label="Edit persona" @click="openEdit(data)">
+                            <template #icon><PencilIcon class="askowl-icon" /></template>
+                        </Button>
+                        <Button text rounded severity="danger" size="small" aria-label="Delete persona" @click="askDelete(data)">
+                            <template #icon><TrashIcon class="askowl-icon" /></template>
+                        </Button>
                     </div>
                 </template>
             </Column>
@@ -249,7 +260,8 @@ function askDelete(persona: PersonaRead): void {
                     </small>
                 </div>
 
-                <Message v-if="formError" severity="error" icon="pi pi-exclamation-circle">
+                <Message v-if="formError" severity="error">
+                    <template #icon><ExclamationCircleIcon class="askowl-icon" /></template>
                     {{ formError }}
                 </Message>
             </div>
@@ -326,7 +338,7 @@ function askDelete(persona: PersonaRead): void {
 
 .field label {
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .field-hint {

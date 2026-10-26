@@ -1,10 +1,22 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
-import { apiFetch, TOKEN_STORAGE_KEY } from "../../shared/api/http";
-import type { LoginRequest, TokenData, UserCreate, UserRead } from "../../entities/user";
+import { apiFetch } from "../../shared/api/http";
+import {
+  clearStoredTokens,
+  getStoredRefreshToken,
+  getStoredToken,
+  setStoredTokens,
+} from "../../shared/api/tokens";
+import type {
+  LoginRequest,
+  LogoutRequest,
+  TokenData,
+  UserCreate,
+  UserRead,
+} from "../../entities/user";
 
 export const useAuthStore = defineStore("auth", () => {
-  const token = ref<string | null>(localStorage.getItem(TOKEN_STORAGE_KEY));
+  const token = ref<string | null>(getStoredToken());
   const user = ref<UserRead | null>(null);
 
   const isAuthenticated = computed(() => token.value !== null);
@@ -18,8 +30,8 @@ export const useAuthStore = defineStore("auth", () => {
       body,
       skipUnauthorizedRedirect: true,
     });
+    setStoredTokens(data.access_token, data.refresh_token);
     token.value = data.access_token;
-    localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
     await fetchMe();
   }
 
@@ -53,10 +65,23 @@ export const useAuthStore = defineStore("auth", () => {
     token.value = null;
     user.value = null;
     userPromise = null;
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    clearStoredTokens();
   }
 
-  function logout(): void {
+  async function logout(): Promise<void> {
+    const refreshToken = getStoredRefreshToken();
+    if (refreshToken !== null) {
+      const body: LogoutRequest = { refresh_token: refreshToken };
+      try {
+        await apiFetch<void>("/auth/logout", {
+          method: "POST",
+          body,
+          skipUnauthorizedRedirect: true,
+        });
+      } catch {
+        // the route is idempotent server-side — clear locally regardless
+      }
+    }
     clearSession();
   }
 

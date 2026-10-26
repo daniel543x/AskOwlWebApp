@@ -6,6 +6,7 @@ import InputText from "primevue/inputtext";
 import Password from "primevue/password";
 import Message from "primevue/message";
 import { useToast } from "primevue/usetoast";
+import { ExclamationCircleIcon } from "@heroicons/vue/24/outline";
 import { useAuthStore } from "../../features/auth/authStore";
 import { ApiError } from "../../shared/api/http";
 import type { LoginForm } from "./types";
@@ -71,7 +72,8 @@ async function submit(): Promise<void> {
                 />
             </div>
 
-            <Message v-if="error" severity="error" icon="pi pi-exclamation-circle" class="form-error">
+            <Message v-if="error" severity="error" class="form-error">
+                <template #icon><ExclamationCircleIcon class="askowl-icon" /></template>
                 {{ error }}
             </Message>
 
@@ -94,7 +96,9 @@ async function submit(): Promise<void> {
 <style scoped>
 .title {
     margin: 0 0 0.25rem;
-    font-size: 1.5rem;
+    font-size: 1.625rem;
+    font-weight: 400;
+    letter-spacing: -0.01em;
 }
 
 .subtitle {
@@ -110,8 +114,9 @@ async function submit(): Promise<void> {
 }
 
 .field label {
-    font-size: 0.875rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--p-text-muted-color);
 }
 
 .form-error {
@@ -127,5 +132,9 @@ async function submit(): Promise<void> {
     text-align: center;
     font-size: 0.875rem;
     color: var(--p-text-muted-color);
+}
+
+.switch :deep(a) {
+    color: var(--p-text-color);
 }
 </style>
