@@ -1,4 +1,5 @@
-export const TOKEN_STORAGE_KEY = "askowl.token";
+import { refreshSession } from "./refresh";
+import { getStoredToken } from "./tokens";
 
 const BASE_PATH = "/api";
 
@@ -20,6 +21,7 @@ export interface RequestOptions {
   params?: QueryParams;
   signal?: AbortSignal;
   skipUnauthorizedRedirect?: boolean;
+  retriedAfterRefresh?: boolean;
 }
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -30,10 +32,6 @@ export function setUnauthorizedHandler(handler: () => void): void {
 
 export function triggerUnauthorized(): void {
   unauthorizedHandler?.();
-}
-
-export function getStoredToken(): string | null {
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
 function buildUrl(path: string, params?: QueryParams): URL {
@@ -105,8 +103,23 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw new ApiError(0, "Network error — could not reach the AskOwl backend.");
   }
 
-  if (response.status === 401 && token && !options.skipUnauthorizedRedirect) {
-    triggerUnauthorized();
+  if (
+    response.status === 401 &&
+    token &&
+    !options.skipUnauthorizedRedirect &&
+    !options.retriedAfterRefresh &&
+    !path.startsWith("/auth/")
+  ) {
+    try {
+      const refreshed = await refreshSession();
+      if (refreshed !== null) {
+        return apiFetch<T>(path, { ...options, retriedAfterRefresh: true });
+      }
+      triggerUnauthorized();
+    } catch {
+      // refresh could not run (offline, backend 5xx) — keep the session and
+      // surface the original 401
+    }
   }
 
   if (!response.ok) {

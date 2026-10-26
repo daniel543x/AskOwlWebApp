@@ -20,10 +20,15 @@ writing code and keep its checkboxes up to date.
   - `api/ask_research_sse.md` — research/agent SSE extensions
   - `api/errors.md` — HTTP status codes and SSE error events
 - `.reference/AskOwlAPI.json` — OpenAPI schema (exact route/field names).
+- `docs/design/DESIGN.md` — the UI style reference ("Gleap": warm
+  cream-paper canvas, graphite-ink CTAs, pill controls, Inter). Read it
+  before any styling work; the theme implementation in `src/shared/theme/`
+  encodes it.
 
 Never edit anything under `.reference/` and never import from it in app code —
-re-declare the types you need in `src/entities/`. The `docs/` folder in the
-repo root contains empty placeholders; ignore it.
+re-declare the types you need in `src/entities/`. The remaining `docs/`
+subfolders (`administration/`, `development/`, `using/`) are empty
+placeholders; ignore them.
 
 ## Commands
 
@@ -83,20 +88,24 @@ Do not re-litigate these; they were agreed with the owner:
 |---|---|
 | Backend | Real AskOwl API only — **no mocks**. Reached through the Vite proxy (`/api`). |
 | Chat modes | **search, research, agent** — all three, with optimistic role gating (see "Roles" below). |
-| Prototype scope | Auth, chat (3 modes), history, user settings (model preferences, personas, API keys). **Admin panel is out of scope.** |
+| Prototype scope | Auth, chat (3 modes), history, user settings (model preferences, personas, API keys), and the admin panel for connections (providers), model entries, and global defaults under `/admin`. User/role administration stays out of scope. |
 | Layout | Sidebar app shell: collapsible sidebar with conversation list; chat fills the rest. |
 | Language | UI text in English. |
-| Theme | Light + dark. Follow system on first visit; toggle persisted in localStorage. **Dark mode = teal accent. Light mode = indigo accent.** |
+| Theme | Light + dark per the **Gleap** design system ([docs/design/DESIGN.md](docs/design/DESIGN.md)): warm linen canvas, white cards, graphite-ink primary CTAs; lime `#4cc02b` reserved for status dots/checkmarks. Follow system on first visit; toggle persisted in localStorage. |
 | Auth in UI | JWT login only (API-key auth is for other clients, not this UI). |
 
 ## Stack rules
 
 - Vue 3.5 Composition API, `<script setup lang="ts">` in every component.
-- UI components: **PrimeVue 4 only** (installed) + `primeicons` for icons.
-  Do NOT add any other component library, CSS framework, or icon set.
+- UI components: **PrimeVue 4 only** (installed) + `@heroicons/vue`
+  (24/outline) for icons — owner decision, primeicons was removed. Icon
+  sizing/composition goes through the global `.askowl-icon` utility and the
+  PrimeVue `#icon` slots (Button, Message, Tag, ConfirmDialog). Do NOT add
+  any other component library, CSS framework, or icon set.
 - Approved dependencies beyond what's installed: `pinia` (state),
-  `marked` (assistant-answer markdown). Anything else must be justified in
-  PLAN.md before adding.
+  `marked` (assistant-answer markdown), `@fontsource-variable/inter` (UI
+  typeface, the DESIGN.md substitute for Switzer). Anything else must be
+  justified in PLAN.md before adding.
 - No i18n framework. No tests required for the prototype.
 - Custom CSS is for layout/spacing polish only — colors come from theme
   tokens, components come from PrimeVue.
@@ -117,24 +126,50 @@ src/
 Pages are thin; logic and state live in `features/` (pinia stores +
 composables) and `shared/`.
 
-## Theming — the dual-accent rule
+## Theming — the Gleap paper/graphite system
 
-Implemented once in `src/shared/theme/`; every page inherits it.
+Implemented in `src/shared/theme/` (`preset.ts` + `theme.ts`); every page
+inherits it. Source of truth: [docs/design/DESIGN.md](docs/design/DESIGN.md)
+(the "Gleap" style reference — read it before styling work).
 
-- PrimeVue 4 styled mode, **Aura** preset as base, configured in `main.ts`
+- PrimeVue 4 styled mode with the custom **`AskOwlPreset`** (Aura base,
+  `definePreset` in `src/shared/theme/preset.ts`), configured in `main.ts`
   with `darkModeSelector: '.app-dark'`.
-- **Dark mode → teal primary. Light mode → indigo primary.** Switch the
-  primary palette at runtime with `updatePrimaryPalette()` from
-  `@primevue/themes` (token refs like `50: '{teal.50}'` … `950: '{teal.950}'`)
-  and toggle the `app-dark` class on `<html>` — the surface palette follows
-  the class automatically.
+- **Warm paper language**: light mode = linen canvas `#edede8`, white cards,
+  graphite-ink primary (`#141414`) pill CTAs. Dark mode is the derived
+  warm-dark inverse: canvas `#171716`, cards `#212120`, cream primary
+  `#e8e7e1` with dark text. Both schemes live in the preset —
+  toggling the `app-dark` class on `<html>` is all the theme module does
+  (no `updatePrimaryPalette` calls anymore).
+- **Card surfaces** use the custom `card.background` semantic token
+  (`var(--p-card-background)`: white in light, `#212120` in dark), NOT
+  `var(--p-surface-0)` — in dark mode the surface ramp's light end doubles
+  as the ink color (`text.color` derives from it), so `surface.0` is cream
+  and unreadable as a card fill.
+- **Color rationing**: the status palettes (green/red/sky/… primitives) are
+  aliased to warm-neutral ramps in the preset, so every success/warn/error
+  surface (toasts, messages, tags, invalid inputs) is achromatic. The TWO
+  chromatic exceptions are defined once in `style.css`: lime `#4cc02b`
+  (`--askowl-lime`) for positive status dots/checkmarks (active API key,
+  up-provider health light, completed research-plan steps — never a fill),
+  and red `#dc2626` (`--askowl-red`) for destructive/danger indicators
+  (user-menu logout, "down" provider health light).
+- **Shapes**: buttons/inputs/selects/tabs are pills (radius 200px via
+  `formField.borderRadius` + component overrides); cards, dialogs, messages,
+  toasts = 12px; textareas = 12px. Tabs render as a segmented pill control
+  (stone track, graphite active segment).
+- **Type**: `@fontsource-variable/inter` ("Inter Variable") as the Switzer
+  substitute; weight 400 for headings with `-0.01em` tracking, 500 for
+  labels/emphasis. Never bold a headline above body weight.
 - On boot: use `localStorage['askowl.theme']` if set, else follow
-  `prefers-color-scheme`. The toggle (sun/moon primeicon in the shell header
-  or sidebar footer) persists the explicit choice back to the same key.
-  Apply the initial class/palette before mounting the app to avoid a flash.
-- Never hardcode hex colors in components. Use PrimeVue design tokens
-  (`var(--p-primary-color)`, `var(--p-text-color)`, `var(--p-content-background)`
-  etc.) or scoped CSS built on them.
+  `prefers-color-scheme`. The toggle (sun/moon Heroicon in the sidebar
+  footer / auth layout) persists the explicit choice back to the same key.
+  Apply the initial class before mounting the app to avoid a flash.
+- Never hardcode hex colors in components (the single exception is the
+  `--askowl-lime` token defined once in `style.css`). Use PrimeVue design
+  tokens (`var(--p-primary-color)`, `var(--p-text-color)`,
+  `var(--p-content-background)`, `var(--p-surface-0)` for cards, …) or
+  scoped CSS built on them. Depth comes from surface tone, not shadows.
 
 ## API access
 
@@ -168,8 +203,12 @@ All requests go through the shared client `src/shared/api/http.ts`:
 - The client attaches `Authorization: Bearer <token>` from the auth store,
   sends/receives JSON, handles 204, and maps non-2xx responses to a typed
   `ApiError` (status + message).
-- **401 anywhere** → clear the session and route to `/login` (the JWT
-  expires after ~30 min; sessions dropping mid-use is expected).
+- **401 anywhere** → the client transparently refreshes once (single-flight
+  `POST /auth/refresh`, then retry the original request) and only clears
+  the session + routes to `/login` when the refresh itself 401s. Access
+  tokens last ~6 h; the single-use refresh token rotates on every refresh
+  (90-day sliding session window). Network/5xx failures during a refresh
+  keep the session and surface the original error instead.
 - Remember: **404 means "not found OR owned by someone else"** — surface it
   as a plain not-found message.
 
@@ -200,9 +239,14 @@ Event overview (payload details in the reference docs):
 ### Auth & roles
 
 - `POST /auth/login` body `{ username_or_email, password }` →
-  `{ access_token, token_type }`. Store the token in
-  `localStorage['askowl.token']`; fetch `GET /auth/users/me` on boot for the
-  user's `nickname`/`email`.
+  `{ access_token, token_type, refresh_token }`. Store BOTH tokens —
+  `localStorage['askowl.token']` and `localStorage['askowl.refresh']`
+  (single writer: `src/shared/api/tokens.ts`) — and fetch
+  `GET /auth/users/me` on boot for the user's `nickname`/`email`. The
+  refresh token is single-use: persist the NEW pair from every refresh
+  response; replaying a rotated token revokes the whole session chain.
+  `POST /auth/logout` `{refresh_token}` revokes server-side (idempotent
+  204) and is fired by the sidebar logout.
 - Registration: `POST /user/` (`{ email, nickname, password }` — note the
   trailing slash, all other routes have none; 201 = success, 400 = duplicate
   email/nickname) then auto-login.
@@ -215,12 +259,13 @@ Event overview (payload details in the reference docs):
 
 | Area | Endpoints (all behind `/api` proxy) |
 |---|---|
-| Auth | `POST /auth/login`, `GET /auth/users/me`, `POST /user` |
+| Auth | `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/users/me`, `POST /user` |
 | Ask | `POST /ask/search` (body `{query, stream, conversation_id?}`, model ids on query string), `GET /ask/research?query=&stream=true`, `GET /ask/agent?goal=&persona_id=` |
 | History | `GET /history`, `GET /history/{id}`, `DELETE /history/{id}` |
 | Personas | `GET/POST /personas`, `GET/PATCH/DELETE /personas/{id}` |
 | API keys | `GET/POST /api-keys`, `DELETE /api-keys/{id}` (`raw_key` shown exactly once at creation; revoke **keeps the row** with `is_active: false` — the UI shows it as "revoked", not deleted) |
 | Models | `GET /models?kind=`, `GET /models/preferences`, `PUT /models/{id}/preference` |
+| Admin | `GET/POST /admin/models/providers`, `PATCH/DELETE /admin/models/providers/{id}`, `GET/POST /admin/models/entries`, `PATCH/DELETE /admin/models/entries/{id}`, `GET /admin/models/defaults`, `PUT /admin/models/defaults/{kind}?model_id=`, `GET /health/models` (re-probe) |
 | Liveness | `GET /healthy` — useful for a "backend offline" indicator |
 
 ## Gotchas

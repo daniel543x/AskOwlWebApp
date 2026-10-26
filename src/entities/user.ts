@@ -12,6 +12,15 @@ export interface LoginRequest {
 export interface TokenData {
   access_token: string;
   token_type: string;
+  refresh_token: string;
+}
+
+export interface RefreshRequest {
+  refresh_token: string;
+}
+
+export interface LogoutRequest {
+  refresh_token: string;
 }
 
 export interface UserRead {
