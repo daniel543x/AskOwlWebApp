@@ -8,6 +8,18 @@ import SelectButton from "primevue/selectbutton";
 import Tag from "primevue/tag";
 import Textarea from "primevue/textarea";
 import { useToast } from "primevue/usetoast";
+import {
+    ArrowPathIcon,
+    BoltIcon,
+    CheckCircleIcon,
+    ClipboardDocumentListIcon,
+    ExclamationCircleIcon,
+    ExclamationTriangleIcon,
+    InformationCircleIcon,
+    MagnifyingGlassIcon,
+    PaperAirplaneIcon,
+    StopIcon,
+} from "@heroicons/vue/24/outline";
 import { apiFetch, ApiError } from "../../shared/api/http";
 import { renderMarkdown } from "../../shared/utils/markdown";
 import { useChatStore } from "../../features/chat/chatStore";
@@ -169,7 +181,7 @@ onBeforeUnmount(() => {
 
         <div ref="scrollEl" class="thread">
             <div v-if="thread.loadingHistory.value" class="thread-note">
-                <i class="pi pi-spin pi-loader"></i>
+                <ArrowPathIcon class="askowl-icon spin" />
                 Loading conversation…
             </div>
 
@@ -192,7 +204,7 @@ onBeforeUnmount(() => {
                 <article v-else class="turn turn-assistant">
                     <div v-if="message.plan" class="plan-block">
                         <div class="plan-title">
-                            <i class="pi pi-list-check"></i>
+                            <ClipboardDocumentListIcon class="askowl-icon" />
                             <span>Research plan</span>
                         </div>
                         <ul class="plan-list">
@@ -201,10 +213,11 @@ onBeforeUnmount(() => {
                                 :key="subquestion"
                                 :class="{ done: message.subqueries?.[subquestion]?.sources }"
                             >
-                                <i
-                                    class="pi"
-                                    :class="message.subqueries?.[subquestion]?.sources ? 'pi-check-circle' : 'pi-circle'"
-                                ></i>
+                                <CheckCircleIcon
+                                    v-if="message.subqueries?.[subquestion]?.sources"
+                                    class="askowl-icon step-done"
+                                />
+                                <span v-else class="step-todo"></span>
                                 <span>{{ subquestion }}</span>
                                 <span
                                     v-if="message.subqueries?.[subquestion]?.chunks"
@@ -218,7 +231,7 @@ onBeforeUnmount(() => {
 
                     <details v-if="message.activity && message.activity.length > 0" class="activity-log">
                         <summary>
-                            <i class="pi pi-bolt"></i>
+                            <BoltIcon class="askowl-icon" />
                             Activity ({{ message.activity.length }})
                         </summary>
                         <ul>
@@ -232,7 +245,7 @@ onBeforeUnmount(() => {
                         v-if="message.status"
                         class="activity-line"
                     >
-                        <i class="pi pi-spin pi-loader"></i>
+                        <ArrowPathIcon class="askowl-icon spin" />
                         <span>{{ message.status }}</span>
                         <span v-if="message.chunks !== undefined && message.chunks !== null" class="activity-detail">
                             {{ message.chunks }} chunks selected
@@ -242,7 +255,7 @@ onBeforeUnmount(() => {
                         v-else-if="message.searchedQuery"
                         class="activity-line done"
                     >
-                        <i class="pi pi-search"></i>
+                        <MagnifyingGlassIcon class="askowl-icon" />
                         <span>Searched: {{ message.searchedQuery }}</span>
                     </div>
 
@@ -268,7 +281,7 @@ onBeforeUnmount(() => {
                     ></div>
 
                     <div v-if="message.streaming && !message.content && !message.status" class="activity-line">
-                        <i class="pi pi-spin pi-loader"></i>
+                        <ArrowPathIcon class="askowl-icon spin" />
                         <span>Generating answer…</span>
                     </div>
 
@@ -277,28 +290,29 @@ onBeforeUnmount(() => {
                             :severity="message.grounding >= 0.7 ? 'success' : 'warn'"
                             rounded
                         >
-                            <i class="pi pi-check-circle" style="font-size: 0.75rem"></i>
+                            <CheckCircleIcon class="askowl-icon" style="font-size: 0.75rem" />
                             Grounded {{ Math.round(message.grounding * 100) }}%
                         </Tag>
                     </div>
 
-                    <Message v-if="message.error" severity="error" icon="pi pi-exclamation-triangle" class="thread-message">
+                    <Message v-if="message.error" severity="error" class="thread-message">
+                        <template #icon><ExclamationTriangleIcon class="askowl-icon" /></template>
                         {{ message.error }}
                     </Message>
                     <Message
                         v-else-if="message.notice?.kind === 'no_context'"
                         severity="info"
-                        icon="pi pi-info-circle"
                         class="thread-message"
                     >
+                        <template #icon><InformationCircleIcon class="askowl-icon" /></template>
                         No usable content was found for this question. Try rephrasing it.
                     </Message>
                     <Message
                         v-else-if="message.notice?.kind === 'budget_exhausted'"
                         severity="warn"
-                        icon="pi pi-exclamation-circle"
                         class="thread-message"
                     >
+                        <template #icon><ExclamationCircleIcon class="askowl-icon" /></template>
                         Stopped early{{ message.notice.reason ? ` (${message.notice.reason})` : "" }} —
                         the answer is based on partial context.
                     </Message>
@@ -320,22 +334,24 @@ onBeforeUnmount(() => {
                 <Button
                     v-if="!thread.streaming.value"
                     class="composer-send"
-                    icon="pi pi-send"
                     rounded
                     :disabled="draft.trim().length === 0"
                     aria-label="Send message"
                     @click="send()"
-                />
+                >
+                    <template #icon><PaperAirplaneIcon class="askowl-icon" /></template>
+                </Button>
                 <Button
                     v-else
                     v-tooltip.bottom="'Stop generating'"
                     class="composer-send"
-                    icon="pi pi-stop"
                     severity="danger"
                     rounded
                     aria-label="Stop generating"
                     @click="thread.stop()"
-                />
+                >
+                    <template #icon><StopIcon class="askowl-icon" /></template>
+                </Button>
             </div>
             <div class="composer-foot">
                 <Select
@@ -383,9 +399,10 @@ onBeforeUnmount(() => {
 
 .plan-block {
     margin: 0.5rem 0;
-    padding: 0.625rem 0.875rem;
+    padding: 0.875rem 1.125rem;
     border: 1px solid var(--p-content-border-color);
-    border-radius: 0.625rem;
+    border-radius: 12px;
+    background: var(--p-card-background);
 }
 
 .plan-title {
@@ -393,7 +410,7 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 0.375rem;
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--p-text-color);
     margin-bottom: 0.375rem;
 }
@@ -419,8 +436,17 @@ onBeforeUnmount(() => {
     color: var(--p-text-color);
 }
 
-.plan-list li .pi-check-circle {
-    color: var(--p-primary-color);
+.plan-list li .step-done {
+    color: var(--askowl-lime);
+}
+
+.step-todo {
+    width: 0.75em;
+    height: 0.75em;
+    flex-shrink: 0;
+    border: 1.5px solid currentColor;
+    border-radius: 9999px;
+    opacity: 0.75;
 }
 
 .plan-chunks {
@@ -478,20 +504,30 @@ onBeforeUnmount(() => {
 }
 
 .hero-mark {
-    color: var(--p-primary-color);
-    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    margin-bottom: 1.25rem;
+    border-radius: 9999px;
+    background: var(--p-surface-400);
+    color: var(--p-text-color);
 }
 
 .hero-title {
     margin: 0 0 0.5rem;
-    font-size: 2rem;
-    letter-spacing: -0.02em;
+    font-size: 2.5rem;
+    font-weight: 400;
+    letter-spacing: -0.01em;
 }
 
 .hero-subtitle {
     margin: 0;
     max-width: 32rem;
     color: var(--p-text-muted-color);
+    font-size: 0.9375rem;
+    line-height: 1.5;
 }
 
 .turn {
@@ -508,10 +544,10 @@ onBeforeUnmount(() => {
 
 .user-bubble {
     max-width: 80%;
-    background: color-mix(in oklab, var(--p-primary-color) 14%, transparent);
-    color: var(--p-text-color);
-    border-radius: 1rem 1rem 0.25rem 1rem;
-    padding: 0.625rem 0.875rem;
+    background: var(--p-primary-color);
+    color: var(--p-primary-contrast-color);
+    border-radius: 1.125rem 1.125rem 0.375rem 1.125rem;
+    padding: 0.625rem 1rem;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
@@ -531,7 +567,7 @@ onBeforeUnmount(() => {
 }
 
 .activity-line.done {
-    color: var(--p-primary-color);
+    color: var(--p-text-color);
 }
 
 .activity-detail {
@@ -550,19 +586,18 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 0.375rem;
     max-width: 16rem;
-    padding: 0.25rem 0.625rem;
+    padding: 0.3125rem 0.75rem;
     border: 1px solid var(--p-content-border-color);
-    border-radius: 999px;
+    border-radius: 200px;
     text-decoration: none;
     font-size: 0.75rem;
     color: var(--p-text-color);
-    background: var(--p-content-background);
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    background: var(--p-card-background);
+    transition: border-color 0.15s ease;
 }
 
 .source-chip:hover {
-    border-color: var(--p-primary-color);
-    background: color-mix(in oklab, var(--p-primary-color) 8%, transparent);
+    border-color: var(--p-text-color);
 }
 
 .source-title {
@@ -572,8 +607,8 @@ onBeforeUnmount(() => {
 }
 
 .source-score {
-    color: var(--p-primary-color);
-    font-weight: 600;
+    color: var(--p-text-muted-color);
+    font-weight: 500;
     flex-shrink: 0;
 }
 
@@ -602,8 +637,8 @@ onBeforeUnmount(() => {
     margin: 0 auto;
     padding: 0.5rem;
     border: 1px solid var(--p-content-border-color);
-    border-radius: 1rem;
-    background: var(--p-content-background);
+    border-radius: 12px;
+    background: var(--p-card-background);
 }
 
 .composer-input {

@@ -12,6 +12,14 @@ import Skeleton from "primevue/skeleton";
 import Tag from "primevue/tag";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
+import {
+    CheckIcon,
+    ClipboardDocumentIcon,
+    ExclamationCircleIcon,
+    ExclamationTriangleIcon,
+    PlusIcon,
+    TrashIcon,
+} from "@heroicons/vue/24/outline";
 import { ApiError } from "../../shared/api/http";
 import { formatRelativeTime } from "../../shared/utils/relativeTime";
 import { useApiKeys } from "../../features/settings/useApiKeys";
@@ -124,7 +132,6 @@ function askDelete(key: { id: string; name: string }): void {
   confirm.require({
     message: `Revoke API key "${key.name}"? Clients using it stop working immediately; the entry stays listed as revoked.`,
     header: "Revoke API key",
-    icon: "pi pi-exclamation-triangle",
     acceptLabel: "Revoke",
     rejectLabel: "Cancel",
     accept: async () => {
@@ -151,7 +158,9 @@ function askDelete(key: { id: string; name: string }): void {
                 API keys authenticate other clients (scripts, backends) against the AskOwl API.
                 They are shown only once at creation.
             </p>
-            <Button icon="pi pi-plus" label="Create key" size="small" @click="openCreate()" />
+            <Button label="Create key" size="small" @click="openCreate()">
+                <template #icon><PlusIcon class="askowl-icon" /></template>
+            </Button>
         </div>
 
         <div v-if="loading" class="table-skeleton">
@@ -161,7 +170,7 @@ function askDelete(key: { id: string; name: string }): void {
                 <Skeleton height="1.25rem" width="15%" />
             </div>
         </div>
-        <DataTable v-else :value="keys" data-key="id" striped-rows>
+        <DataTable v-else :value="keys" data-key="id">
             <template #empty>
                 <span class="empty-note">No API keys yet.</span>
             </template>
@@ -180,7 +189,10 @@ function askDelete(key: { id: string; name: string }): void {
             </Column>
             <Column header="Status" style="width: 12%">
                 <template #body="{ data }">
-                    <Tag :value="keyStatus(data).label" :severity="keyStatus(data).severity" rounded />
+                    <Tag :severity="keyStatus(data).severity" rounded>
+                        <span class="status-dot" :class="keyStatus(data).label"></span>
+                        {{ keyStatus(data).label }}
+                    </Tag>
                 </template>
             </Column>
             <Column header="Expires" style="width: 14%">
@@ -196,14 +208,15 @@ function askDelete(key: { id: string; name: string }): void {
             <Column header="Actions" style="width: 5rem">
                 <template #body="{ data }">
                     <Button
-                        icon="pi pi-trash"
                         text
                         rounded
                         severity="danger"
                         size="small"
                         aria-label="Revoke key"
                         @click="askDelete(data)"
-                    />
+                    >
+                        <template #icon><TrashIcon class="askowl-icon" /></template>
+                    </Button>
                 </template>
             </Column>
         </DataTable>
@@ -235,7 +248,8 @@ function askDelete(key: { id: string; name: string }): void {
                     <label for="key-expiry">Expiry (optional)</label>
                     <DatePicker id="key-expiry" v-model="form.expiresAt" show-icon fluid date-format="yy-mm-dd" />
                 </div>
-                <Message v-if="formError" severity="error" icon="pi pi-exclamation-circle">
+                <Message v-if="formError" severity="error">
+                    <template #icon><ExclamationCircleIcon class="askowl-icon" /></template>
                     {{ formError }}
                 </Message>
             </div>
@@ -254,18 +268,23 @@ function askDelete(key: { id: string; name: string }): void {
             @hide="created = null"
         >
             <div v-if="created" class="created-body">
-                <Message severity="warn" icon="pi pi-exclamation-triangle" :pt="{ text: { style: { textAlign: 'left' } } }">
+                <Message severity="warn" :pt="{ text: { style: { textAlign: 'left' } } }">
+                    <template #icon><ExclamationTriangleIcon class="askowl-icon" /></template>
                     <strong>Copy it now — this is the only time the full key is shown.</strong>
                 </Message>
                 <div class="raw-key-row">
                     <code class="raw-key">{{ created.raw_key }}</code>
                     <Button
-                        :icon="copied ? 'pi pi-check' : 'pi pi-copy'"
                         :severity="copied ? 'success' : 'primary'"
                         rounded
                         aria-label="Copy key"
                         @click="copyRawKey()"
-                    />
+                    >
+                        <template #icon>
+                            <CheckIcon v-if="copied" class="askowl-icon" />
+                            <ClipboardDocumentIcon v-else class="askowl-icon" />
+                        </template>
+                    </Button>
                 </div>
                 <p class="created-hint">
                     Only the prefix <code>{{ created.key_prefix }}…</code> is stored in plain sight;
@@ -316,6 +335,23 @@ function askDelete(key: { id: string; name: string }): void {
     flex-wrap: wrap;
 }
 
+.status-dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--p-text-muted-color);
+}
+
+.status-dot.active {
+    background: var(--askowl-lime);
+}
+
+.status-dot.revoked {
+    background: transparent;
+    border: 1px solid var(--p-text-muted-color);
+}
+
 .table-skeleton {
     display: flex;
     flex-direction: column;
@@ -343,7 +379,7 @@ function askDelete(key: { id: string; name: string }): void {
 
 .field label {
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 .field-hint {

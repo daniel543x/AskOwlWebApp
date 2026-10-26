@@ -50,6 +50,17 @@ const router = createRouter({
         },
       ],
     },
+    {
+      path: "/admin",
+      component: () => import("../components/layout/AppShell.vue"),
+      children: [
+        {
+          path: "",
+          name: "admin",
+          component: () => import("../pages/admin/AdminView.vue"),
+        },
+      ],
+    },
     { path: "/:pathMatch(.*)*", redirect: "/chat" },
   ],
 });

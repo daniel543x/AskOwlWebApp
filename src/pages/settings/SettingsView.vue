@@ -9,6 +9,13 @@ import TabPanel from "primevue/tabpanel";
 import TabPanels from "primevue/tabpanels";
 import Tabs from "primevue/tabs";
 import { useToast } from "primevue/usetoast";
+import {
+    ArrowPathIcon,
+    CubeIcon,
+    InformationCircleIcon,
+    KeyIcon,
+    UserCircleIcon,
+} from "@heroicons/vue/24/outline";
 import { ApiError } from "../../shared/api/http";
 import { MODEL_KINDS, type ModelKind } from "../../entities/models";
 import { useModels } from "../../features/settings/useModels";
@@ -88,9 +95,9 @@ async function changePreference(kind: ModelKind, modelId: string): Promise<void>
 
         <Tabs v-model:value="activeTab" scrollable>
             <TabList>
-                <Tab value="models"><i class="pi pi-box"></i> Models</Tab>
-                <Tab value="personas"><i class="pi pi-user-edit"></i> Personas</Tab>
-                <Tab value="keys"><i class="pi pi-key"></i> API Keys</Tab>
+                <Tab value="models"><CubeIcon class="askowl-icon" /> Models</Tab>
+                <Tab value="personas"><UserCircleIcon class="askowl-icon" /> Personas</Tab>
+                <Tab value="keys"><KeyIcon class="askowl-icon" /> API Keys</Tab>
             </TabList>
             <TabPanels>
                 <TabPanel value="models">
@@ -98,8 +105,8 @@ async function changePreference(kind: ModelKind, modelId: string): Promise<void>
                         <Message
                             v-if="visibleKinds.length === 0 && !modelsStore.loading.value"
                             severity="info"
-                            icon="pi pi-info-circle"
                         >
+                            <template #icon><InformationCircleIcon class="askowl-icon" /></template>
                             The model catalog is empty — an administrator has to register providers
                             and models.
                         </Message>
@@ -136,13 +143,15 @@ async function changePreference(kind: ModelKind, modelId: string): Promise<void>
 
                         <div class="panel-foot">
                             <Button
-                                icon="pi pi-refresh"
                                 label="Reload catalog"
                                 text
                                 size="small"
                                 :loading="modelsStore.loading.value"
                                 @click="modelsStore.load()"
-                            />
+                            >
+                                <template #icon><ArrowPathIcon class="askowl-icon" /></template>
+                                <template #loadingicon><ArrowPathIcon class="askowl-icon spin" /></template>
+                            </Button>
                         </div>
                     </div>
                 </TabPanel>
@@ -169,7 +178,9 @@ async function changePreference(kind: ModelKind, modelId: string): Promise<void>
 
 .settings-head h1 {
     margin: 0 0 0.25rem;
-    font-size: 1.5rem;
+    font-size: 2rem;
+    font-weight: 400;
+    letter-spacing: -0.01em;
 }
 
 .settings-sub {
@@ -188,9 +199,10 @@ async function changePreference(kind: ModelKind, modelId: string): Promise<void>
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.875rem 1rem;
+    padding: 0.875rem 1.125rem;
     border: 1px solid var(--p-content-border-color);
-    border-radius: 0.75rem;
+    border-radius: 12px;
+    background: var(--p-card-background);
 }
 
 .kind-head {
@@ -201,6 +213,7 @@ async function changePreference(kind: ModelKind, modelId: string): Promise<void>
 .kind-head h2 {
     margin: 0;
     font-size: 0.9375rem;
+    font-weight: 500;
 }
 
 .kind-hint {

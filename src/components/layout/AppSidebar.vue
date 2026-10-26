@@ -1,20 +1,38 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import Button from "primevue/button";
+import Dialog from "primevue/dialog";
+import InputText from "primevue/inputtext";
 import Skeleton from "primevue/skeleton";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
 import { useAuthStore } from "../../features/auth/authStore";
 import { useChatStore } from "../../features/chat/chatStore";
 import { useTheme } from "../../shared/theme/theme";
+import {
+    ArrowRightStartOnRectangleIcon,
+    ChevronDoubleLeftIcon,
+    ChevronDoubleRightIcon,
+    Cog6ToothIcon,
+    EllipsisHorizontalIcon,
+    MoonIcon,
+    PencilIcon,
+    PlusIcon,
+    ServerStackIcon,
+    SunIcon,
+    TrashIcon,
+    UserIcon,
+    XMarkIcon,
+} from "@heroicons/vue/24/outline";
 import { ApiError } from "../../shared/api/http";
-import { formatRelativeTime } from "../../shared/utils/relativeTime";
 import AppLogo from "../AppLogo.vue";
 import type { ConversationRead } from "../../entities/history";
 
 defineProps<{ inDrawer?: boolean }>();
 const emit = defineEmits<{ navigate: [] }>();
+
+const collapsed = defineModel<boolean>({ default: false });
 
 const route = useRoute();
 const router = useRouter();
@@ -28,6 +46,52 @@ const activeId = computed(() =>
   route.name === "conversation" ? (route.params.conversationId as string) : null,
 );
 
+interface ConversationGroup {
+  label: string;
+  items: ConversationRead[];
+}
+
+const DAY_MS = 86_400_000;
+
+function conversationDate(conversation: ConversationRead): Date {
+  return new Date(conversation.updated_at ?? conversation.created_at);
+}
+
+function startOfDay(date: Date): number {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy.getTime();
+}
+
+const groupedConversations = computed<ConversationGroup[]>(() => {
+  const today = startOfDay(new Date());
+  const groups = new Map<string, ConversationRead[]>();
+  const sorted = [...chat.conversations].sort(
+    (a, b) => conversationDate(b).getTime() - conversationDate(a).getTime(),
+  );
+  for (const conversation of sorted) {
+    const date = conversationDate(conversation);
+    const daysAgo = Math.round((today - startOfDay(date)) / DAY_MS);
+    let label: string;
+    if (daysAgo < 1) {
+      label = "Today";
+    } else if (daysAgo < 2) {
+      label = "Yesterday";
+    } else if (daysAgo < 7) {
+      label = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(date);
+    } else {
+      label = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(date);
+    }
+    const group = groups.get(label);
+    if (group) {
+      group.push(conversation);
+    } else {
+      groups.set(label, [conversation]);
+    }
+  }
+  return [...groups.entries()].map(([label, items]) => ({ label, items }));
+});
+
 onMounted(() => {
   chat.loadConversations().catch((error: unknown) => {
     toast.add({
@@ -40,10 +104,10 @@ onMounted(() => {
 });
 
 function askDelete(conversation: ConversationRead): void {
+  itemMenuId.value = null;
   confirm.require({
     message: `Delete "${conversation.title}"? This cannot be undone.`,
     header: "Delete conversation",
-    icon: "pi pi-exclamation-triangle",
     acceptLabel: "Delete",
     rejectLabel: "Cancel",
     accept: async () => {
@@ -65,14 +129,127 @@ function askDelete(conversation: ConversationRead): void {
 }
 
 async function logout(): Promise<void> {
-  auth.logout();
+  await auth.logout();
   chat.reset();
   await router.push({ name: "login" });
 }
+
+const itemMenuId = ref<string | null>(null);
+const itemMenuStyle = ref<Record<string, string>>({});
+
+function toggleItemMenu(event: MouseEvent, id: string): void {
+  if (itemMenuId.value === id) {
+    itemMenuId.value = null;
+    return;
+  }
+  const anchor = event.currentTarget;
+  if (anchor instanceof HTMLElement) {
+    const rect = anchor.getBoundingClientRect();
+    itemMenuStyle.value = {
+      top: `${Math.max(8, Math.min(rect.top, window.innerHeight - 128))}px`,
+      right: `${window.innerWidth - rect.right}px`,
+    };
+  }
+  itemMenuId.value = id;
+}
+
+const renameOpen = ref(false);
+const renaming = ref<ConversationRead | null>(null);
+const renameValue = ref("");
+
+function startRename(conversation: ConversationRead): void {
+  itemMenuId.value = null;
+  renaming.value = conversation;
+  renameValue.value = conversation.title;
+  renameOpen.value = true;
+}
+
+function submitRename(): void {
+  const conversation = renaming.value;
+  const title = renameValue.value.trim();
+  if (!conversation || title.length === 0) {
+    return;
+  }
+  chat.renameConversation(conversation.id, title);
+  renameOpen.value = false;
+}
+
+const menuOpen = ref(false);
+const userRowEl = ref<HTMLElement | null>(null);
+const menuBtnEl = ref<HTMLElement | null>(null);
+const menuStyle = ref<Record<string, string>>({});
+
+function closeMenu(): void {
+  menuOpen.value = false;
+}
+
+function closeMenuAndNavigate(): void {
+  menuOpen.value = false;
+  emit("navigate");
+}
+
+function toggleThemeFromMenu(): void {
+  toggle();
+  closeMenu();
+}
+
+function toggleMenu(): void {
+  if (menuOpen.value) {
+    menuOpen.value = false;
+    return;
+  }
+  const anchor = menuBtnEl.value;
+  if (anchor) {
+    const rect = anchor.getBoundingClientRect();
+    menuStyle.value = collapsed.value
+      ? {
+          left: `${rect.right + 8}px`,
+          bottom: `${window.innerHeight - rect.bottom}px`,
+        }
+      : {
+          right: `${window.innerWidth - rect.right}px`,
+          bottom: `${window.innerHeight - rect.top + 8}px`,
+        };
+  }
+  menuOpen.value = true;
+}
+
+watch(collapsed, () => {
+  menuOpen.value = false;
+});
+
+watch(
+  () => route.fullPath,
+  () => {
+    menuOpen.value = false;
+    itemMenuId.value = null;
+  },
+);
+
+function onDocumentClick(event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  if (menuOpen.value && userRowEl.value && !userRowEl.value.contains(target)) {
+    menuOpen.value = false;
+  }
+  if (itemMenuId.value !== null && !target.closest(".conversation-item")) {
+    itemMenuId.value = null;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("click", onDocumentClick);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onDocumentClick);
+});
 </script>
 
 <template>
-    <nav class="sidebar">
+    <nav class="sidebar" :class="{ collapsed }">
         <div class="sidebar-header">
             <RouterLink class="brand" :to="{ name: 'chat' }" @click="emit('navigate')">
                 <AppLogo :size="26" />
@@ -81,22 +258,36 @@ async function logout(): Promise<void> {
             <Button
                 v-if="inDrawer"
                 class="drawer-close"
-                icon="pi pi-times"
                 text
                 rounded
                 severity="secondary"
                 aria-label="Close menu"
                 @click="emit('navigate')"
-            />
+            >
+                <template #icon><XMarkIcon class="askowl-icon" /></template>
+            </Button>
+            <Button
+                class="collapse-btn"
+                text
+                rounded
+                severity="secondary"
+                :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                @click="collapsed = !collapsed"
+            >
+                <template #icon>
+                    <ChevronDoubleRightIcon v-if="collapsed" class="askowl-icon" />
+                    <ChevronDoubleLeftIcon v-else class="askowl-icon" />
+                </template>
+            </Button>
         </div>
 
         <RouterLink
             class="new-chat"
-            :class="{ active: route.name === 'chat' }"
+            aria-label="New chat"
             :to="{ name: 'chat' }"
             @click="emit('navigate')"
         >
-            <i class="pi pi-plus"></i>
+            <PlusIcon class="askowl-icon" />
             <span>New chat</span>
         </RouterLink>
 
@@ -112,64 +303,122 @@ async function logout(): Promise<void> {
                 <br />
                 Ask your first question!
             </p>
-            <RouterLink
-                v-for="conversation in chat.conversations"
-                v-else
-                :key="conversation.id"
-                class="conversation-item"
-                :class="{ active: conversation.id === activeId }"
-                :to="{ name: 'conversation', params: { conversationId: conversation.id } }"
-                @click="emit('navigate')"
-            >
-                <span class="conversation-title">{{ conversation.title }}</span>
-                <span class="conversation-meta">
-                    <span class="conversation-date">
-                        {{ formatRelativeTime(conversation.updated_at ?? conversation.created_at) }}
-                    </span>
-                    <Button
-                        class="delete-btn"
-                        icon="pi pi-trash"
-                        text
-                        rounded
-                        severity="danger"
-                        aria-label="Delete conversation"
-                        @click.prevent="askDelete(conversation)"
-                    />
-                </span>
-            </RouterLink>
+            <template v-else>
+                <div
+                    v-for="group in groupedConversations"
+                    :key="group.label"
+                    class="conversation-group"
+                >
+                    <p class="group-label">{{ group.label }}</p>
+                    <div
+                        v-for="conversation in group.items"
+                        :key="conversation.id"
+                        class="conversation-item"
+                        :class="{ active: conversation.id === activeId }"
+                    >
+                        <RouterLink
+                            class="conversation-link"
+                            :to="{ name: 'conversation', params: { conversationId: conversation.id } }"
+                            @click="emit('navigate')"
+                        >
+                            <span class="conversation-title">{{ conversation.title }}</span>
+                        </RouterLink>
+                        <span class="item-anchor">
+                            <Button
+                                class="item-menu-btn"
+                                text
+                                rounded
+                                severity="secondary"
+                                aria-label="Conversation options"
+                                @click="toggleItemMenu($event, conversation.id)"
+                            >
+                                <template #icon><EllipsisHorizontalIcon class="askowl-icon" /></template>
+                            </Button>
+                        </span>
+                        <div
+                            v-if="itemMenuId === conversation.id"
+                            class="item-menu"
+                            :style="itemMenuStyle"
+                        >
+                            <button class="menu-item" type="button" @click="startRename(conversation)">
+                                <PencilIcon class="askowl-icon" />
+                                <span>Rename</span>
+                            </button>
+                            <button class="menu-item menu-item-danger" type="button" @click="askDelete(conversation)">
+                                <TrashIcon class="askowl-icon" />
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
 
         <div class="sidebar-footer">
-            <RouterLink
-                class="nav-item"
-                :class="{ active: route.name === 'settings' }"
-                :to="{ name: 'settings' }"
-                @click="emit('navigate')"
-            >
-                <i class="pi pi-cog"></i>
-                <span>Settings</span>
-            </RouterLink>
-            <div class="user-row">
-                <i class="pi pi-user user-icon"></i>
+            <div ref="userRowEl" class="user-row">
+                <UserIcon class="askowl-icon user-icon" />
                 <span class="nickname" :title="auth.user?.email">{{ auth.user?.nickname ?? "…" }}</span>
-                <Button
-                    :icon="mode === 'dark' ? 'pi pi-sun' : 'pi pi-moon'"
-                    text
-                    rounded
-                    severity="secondary"
-                    :aria-label="mode === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
-                    @click="toggle()"
-                />
-                <Button
-                    icon="pi pi-sign-out"
-                    text
-                    rounded
-                    severity="secondary"
-                    aria-label="Log out"
-                    @click="logout()"
-                />
+                <span ref="menuBtnEl" class="menu-anchor">
+                    <Button
+                        text
+                        rounded
+                        severity="secondary"
+                        aria-label="Open user menu"
+                        :aria-expanded="menuOpen"
+                        @click="toggleMenu()"
+                    >
+                        <template #icon><EllipsisHorizontalIcon class="askowl-icon" /></template>
+                    </Button>
+                </span>
+                <div v-if="menuOpen" class="user-menu" :style="menuStyle">
+                    <button class="menu-item" type="button" @click="toggleThemeFromMenu()">
+                        <SunIcon v-if="mode === 'dark'" class="askowl-icon" />
+                        <MoonIcon v-else class="askowl-icon" />
+                        <span>{{ mode === "dark" ? "Light theme" : "Dark theme" }}</span>
+                    </button>
+                    <RouterLink class="menu-item" :to="{ name: 'settings' }" @click="closeMenuAndNavigate()">
+                        <Cog6ToothIcon class="askowl-icon" />
+                        <span>Settings</span>
+                    </RouterLink>
+                    <RouterLink class="menu-item" :to="{ name: 'admin' }" @click="closeMenuAndNavigate()">
+                        <ServerStackIcon class="askowl-icon" />
+                        <span>Admin</span>
+                    </RouterLink>
+                    <button class="menu-item menu-logout" type="button" @click="logout()">
+                        <ArrowRightStartOnRectangleIcon class="askowl-icon" />
+                        <span>Log out</span>
+                    </button>
+                </div>
             </div>
         </div>
+
+        <Dialog
+            v-model:visible="renameOpen"
+            modal
+            header="Rename conversation"
+            :style="{ width: '24rem', maxWidth: '95vw' }"
+            @hide="renaming = null"
+        >
+            <div class="rename-body">
+                <label for="rename-title">Name</label>
+                <InputText
+                    id="rename-title"
+                    v-model="renameValue"
+                    maxlength="100"
+                    fluid
+                    autofocus
+                    @keydown.enter="submitRename()"
+                />
+            </div>
+            <template #footer>
+                <Button label="Cancel" text severity="secondary" @click="renameOpen = false" />
+                <Button
+                    label="Save"
+                    :disabled="renameValue.trim().length === 0"
+                    @click="submitRename()"
+                />
+            </template>
+        </Dialog>
     </nav>
 </template>
 
@@ -192,6 +441,70 @@ async function logout(): Promise<void> {
     .drawer-close {
         display: none;
     }
+
+    .sidebar.collapsed .sidebar-header {
+        position: relative;
+        justify-content: center;
+    }
+
+    .sidebar.collapsed .brand-name {
+        display: none;
+    }
+
+    .sidebar.collapsed .brand {
+        position: relative;
+        z-index: 1;
+        transition: opacity 0.15s ease;
+    }
+
+    .sidebar.collapsed .collapse-btn {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .sidebar.collapsed .sidebar-header:hover .brand,
+    .sidebar.collapsed .sidebar-header:has(:focus-visible) .brand {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    @media (hover: none) {
+        .sidebar.collapsed .brand {
+            display: none;
+        }
+    }
+
+    .sidebar.collapsed .new-chat span {
+        display: none;
+    }
+
+    .sidebar.collapsed .new-chat {
+        padding: 0.5rem 0;
+    }
+
+    .sidebar.collapsed .conversation-list {
+        display: none;
+    }
+
+    .sidebar.collapsed .user-icon,
+    .sidebar.collapsed .nickname {
+        display: none;
+    }
+
+    .sidebar.collapsed .user-row {
+        justify-content: center;
+    }
+}
+
+.collapse-btn {
+    display: none;
+}
+
+@media (min-width: 901px) {
+    .collapse-btn {
+        display: inline-flex;
+    }
 }
 
 .brand {
@@ -200,38 +513,33 @@ async function logout(): Promise<void> {
     gap: 0.5rem;
     text-decoration: none;
     color: var(--p-text-color);
-    font-weight: 700;
-    font-size: 1.05rem;
+    font-weight: 500;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
 }
 
-.brand :deep(svg),
-.brand-name {
-    color: var(--p-primary-color);
+.brand :deep(svg) {
+    color: var(--p-text-color);
 }
 
 .new-chat {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
-    margin: 0.25rem 0.75rem 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--p-content-border-color);
-    border-radius: 0.5rem;
+    margin: 0.25rem 0.75rem 0.875rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 200px;
+    background: var(--p-primary-color);
+    color: var(--p-primary-contrast-color);
     text-decoration: none;
-    color: var(--p-text-color);
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: background-color 0.15s ease;
 }
 
 .new-chat:hover {
-    background: var(--p-content-hover-background);
-}
-
-.new-chat.active {
-    background: color-mix(in oklab, var(--p-primary-color) 14%, transparent);
-    border-color: color-mix(in oklab, var(--p-primary-color) 35%, transparent);
-    color: var(--p-primary-color);
+    background: var(--p-primary-hover-color);
 }
 
 .conversation-list {
@@ -248,7 +556,7 @@ async function logout(): Promise<void> {
     padding: 0.75rem;
     text-align: center;
     color: var(--p-text-muted-color);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     line-height: 1.5;
 }
 
@@ -259,15 +567,29 @@ async function logout(): Promise<void> {
     padding: 0.625rem;
 }
 
-.conversation-item {
+.conversation-group {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
-    padding: 0.5rem 0.625rem;
-    border-radius: 0.5rem;
-    text-decoration: none;
-    color: var(--p-text-color);
+}
+
+.group-label {
+    margin: 0.625rem 0.875rem 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--p-text-muted-color);
+}
+
+.conversation-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 200px;
     font-size: 0.875rem;
+    transition: background-color 0.15s ease;
 }
 
 .conversation-item:hover {
@@ -275,72 +597,143 @@ async function logout(): Promise<void> {
 }
 
 .conversation-item.active {
-    background: color-mix(in oklab, var(--p-primary-color) 14%, transparent);
-    color: var(--p-primary-color);
+    background: var(--p-content-hover-background);
+    color: var(--p-text-color);
+}
+
+.conversation-link {
+    flex: 1;
+    min-width: 0;
+    text-decoration: none;
+    color: var(--p-text-color);
+}
+
+.conversation-item.active .conversation-title::before {
+    content: "";
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    margin-right: 0.4375rem;
+    margin-bottom: 0.0625rem;
+    border-radius: 9999px;
+    background: var(--p-primary-color);
+    vertical-align: baseline;
 }
 
 .conversation-title {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.conversation-meta {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.item-anchor {
+    display: inline-flex;
+    flex-shrink: 0;
 }
 
-.conversation-date {
-    font-size: 0.75rem;
-    color: var(--p-text-muted-color);
-}
-
-.delete-btn {
+.item-menu-btn {
     opacity: 0;
     width: 1.75rem;
     height: 1.75rem;
 }
 
-.conversation-item:hover .delete-btn,
-.conversation-item:focus-within .delete-btn {
+.conversation-item:hover .item-menu-btn,
+.conversation-item:focus-within .item-menu-btn {
     opacity: 1;
+}
+
+.item-menu {
+    position: fixed;
+    z-index: 1200;
+    min-width: 8.5rem;
+    padding: 0.375rem;
+    display: flex;
+    flex-direction: column;
+    background: var(--p-card-background);
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 12px;
+}
+
+.menu-item-danger {
+    color: var(--askowl-red);
+}
+
+.menu-item-danger:hover {
+    background: color-mix(in srgb, var(--askowl-red) 10%, transparent);
+}
+
+.rename-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.rename-body label {
+    font-size: 0.8125rem;
+    color: var(--p-text-muted-color);
 }
 
 .sidebar-footer {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    margin-top: auto;
     padding: 0.5rem 0.75rem 0.875rem;
     border-top: 1px solid var(--p-content-border-color);
 }
 
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.625rem;
-    border-radius: 0.5rem;
-    text-decoration: none;
-    color: var(--p-text-color);
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.nav-item:hover {
-    background: var(--p-content-hover-background);
-}
-
-.nav-item.active {
-    background: color-mix(in oklab, var(--p-primary-color) 14%, transparent);
-    color: var(--p-primary-color);
-}
-
 .user-row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.25rem;
     padding-top: 0.375rem;
+}
+
+.menu-anchor {
+    display: inline-flex;
+}
+
+.user-menu {
+    position: fixed;
+    z-index: 1200;
+    min-width: 11rem;
+    padding: 0.375rem;
+    display: flex;
+    flex-direction: column;
+    background: var(--p-card-background);
+    border: 1px solid var(--p-content-border-color);
+    border-radius: 12px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--p-text-color);
+    font: inherit;
+    font-size: 0.875rem;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.menu-item:hover {
+    background: var(--p-content-hover-background);
+}
+
+.menu-logout {
+    color: var(--askowl-red);
+    font-weight: 600;
+}
+
+.menu-logout:hover {
+    background: color-mix(in srgb, var(--askowl-red) 10%, transparent);
 }
 
 .user-icon {
@@ -354,6 +747,6 @@ async function logout(): Promise<void> {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 500;
 }
 </style>
